@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Шахматы</title>
+<style>
+body{margin:0;background:#161512;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;user-select:none;overflow:hidden}
+#status{font-size:18px;font-weight:700;margin-bottom:12px;background:#262421;padding:10px 20px;border-radius:8px;width:90vw;max-width:360px;text-align:center;box-sizing:border-box}
+#board{display:grid;grid-template-columns:repeat(8,11.2vw);grid-template-rows:repeat(8,11.2vw);max-width:360px;max-height:360px;border:4px solid #262421;border-radius:6px}
+@media(min-width:400px){#board{grid-template-columns:repeat(8,45px);grid-template-rows:repeat(8,45px)}}
+.sq{position:relative;display:flex;align-items:center;justify-content:center;font-size:8.5vw;cursor:pointer}
+@media(min-width:400px){.sq{font-size:34px}}
+.l{background:#f0d9b5}.d{background:#b58863}.sel{background:#cdd26a!important}.lm{background:rgba(205,210,106,.55)!important}
+.hint::after{content:'';width:28%;height:28%;background:rgba(20,85,30,.45);border-radius:50%;position:absolute}
+.cap::after{content:'';width:80%;height:80%;border:3px solid rgba(20,85,30,.5);border-radius:50%;position:absolute}
+.pw{color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 1px 3px #000}
+.pb{color:#111;text-shadow:0 0 1px #fff}
+button{margin-top:16px;padding:12px 24px;font-size:16px;font-weight:700;background:#629924;color:#fff;border:none;border-radius:8px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="status">Ваш ход (Белые)</div>
+<div id="board"></div>
+<button onclick="init()">Новая партия</button>
+<script>
+const P={'P':'♙','R':'♖','N':'♘','B':'♗','Q':'♕','K':'♔','p':'♟','r':'♜','n':'♞','b':'♝','q':'♛','k':'♚'};
+let b=[],turn='w',sel=null,moves=[],lm=null,over=false;
+const bEl=document.getElementById('board'),sEl=document.getElementById('status');
+
+function init(){
+b=[['r','n','b','q','k','b','n','r'],['p','p','p','p','p','p','p','p'],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['P','P','P','P','P','P','P','P'],['R','N','B','Q','K','B','N','R']];
+turn='w';sel=null;moves=[];lm=null;over=false;sEl.innerText='Ваш ход (Белые)';render();
+}
+const isW=p=>p&&p===p.toUpperCase();
+const same=(p1,p2)=>p1&&p2&&isW(p1)===isW(p2);
+
+function getPM(br,r,c){
+const p=br[r][c];if(!p)return[];
+const m=[],w=isW(p),dir=w?-1:1,t=p.toUpperCase();
+const add=(nr,nc)=>{if(nr>=0&&nr<8&&nc>=0&&nc<8&&!same(p,br[nr][nc]))m.push({r:nr,c:nc})};
+if(t==='P'){
+if(r+dir>=0&&r+dir<8&&!br[r+dir][c]){m.push({r:r+dir,c});if((w&&r===6||!w&&r===1)&&!br[r+2*dir][c])m.push({r:r+2*dir,c})}
+[-1,1].forEach(dc=>{const nr=r+dir,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8&&br[nr][nc]&&!same(p,br[nr][nc]))m.push({r:nr,c:nc})});
+}else if(t==='N'){[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>add(r+dr,c+dc));}
+else if(t==='K'){for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++)if(dr||dc)add(r+dr,c+dc);}
+else{
+const dirs=[];
+if(t==='R'||t==='Q')dirs.push([-1,0],[1,0],[0,-1],[0,1]);
+if(t==='B'||t==='Q')dirs.push([-1,-1],[-1,1],[1,-1],[1,1]);
+dirs.forEach(([dr,dc])=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){if(!br[nr][nc])m.push({r:nr,c:nc});else{if(!same(p,br[nr][nc]))m.push({r:nr,c:nc});break}nr+=dr;nc+=dc}});
+}return m;
+}
+
+function inCheck(br,wt){
+let kr=-1,kc=-1,k=wt?'K':'k';
+for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(br[r][c]===k){kr=r;kc=c}
+for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(br[r][c]&&isW(br[r][c])!==wt)if(getPM(br,r,c).some(x=>x.r===kr&&x.c===kc))return true;
+return false;
+}
+
+function getLM(br,r,c){
+const p=br[r][c];if(!p)return[];const w=isW(p);
+return getPM(br,r,c).filter(m=>{const cp=br.map(x=>[...x]);cp[m.r][m.c]=cp[r][c];cp[r][c]='';return!inCheck(cp,w)});
+}
+
+function hasMoves(br,wt){
+for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(br[r][c]&&isW(br[r][c])===wt&&getLM(br,r,c).length)return true;
+return false;
+}
+
+function moveP(fr,fc,tr,tc){
+let p=b[fr][fc];if(p==='P'&&tr===0)p='Q';if(p==='p'&&tr===7)p='q';
+b[tr][tc]=p;b[fr][fc]='';lm={fr,fc,tr,tc};
+}
+
+function clickSq(r,c){
+if(over||turn!=='w')return;
+const mv=moves.find(m=>m.r===r&&m.c===c);
+if(mv&&sel){moveP(sel.r,sel.c,r,c);sel=null;moves=[];turn='b';render();checkBot();return}
+if(b[r][c]&&isW(b[r][c])){sel={r,c};moves=getLM(b,r,c)}else{sel=null;moves=[]}
+render();
+}
+
+function checkBot(){
+if(!hasMoves(b,false)){over=true;sEl.innerText=inCheck(b,false)?'Мат! Вы победили!':'Ничья!';return}
+sEl.innerText=inCheck(b,false)?'Шах! Ход бота...':'Ход компьютера...';
+setTimeout(bot,300);
+}
+
+function bot(){
+const all=[],val={'P':10,'N':30,'B':30,'R':50,'Q':90,'K':900};
+for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(b[r][c]&&!isW(b[r][c])){
+getLM(b,r,c).forEach(m=>{let sc=Math.random()*5;if(b[m.r][m.c])sc+=val[b[m.r][m.c].toUpperCase()]*10;all.push({fr:r,fc:c,tr:m.r,tc:m.c,sc})});
+}
+if(all.length){all.sort((a,b)=>b.sc-a.sc);moveP(all[0].fr,all[0].fc,all[0].tr,all[0].tc)}
+turn='w';render();
+if(!hasMoves(b,true)){over=true;sEl.innerText=inCheck(b,true)?'Мат! Бот победил.':'Ничья!'}
+else sEl.innerText=inCheck(b,true)?'Вам шах! Ваш ход':'Ваш ход (Белые)';
+}
+
+function render(){
+bEl.innerHTML='';
+for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+const sq=document.createElement('div');
+sq.className='sq '+((r+c)%2===0?'l':'d');
+if(lm&&((lm.fr===r&&lm.fc===c)||(lm.tr===r&&lm.tc===c)))sq.classList.add('lm');
+if(sel&&sel.r===r&&sel.c===c)sq.classList.add('sel');
+if(moves.some(m=>m.r===r&&m.c===c))sq.classList.add(b[r][c]?'cap':'hint');
+if(b[r][c]){sq.innerText=P[b[r][c]];sq.classList.add(isW(b[r][c])?'pw':'pb')}
+sq.onclick=()=>clickSq(r,c);bEl.appendChild(sq);
+}
+}
+init();
+</script>
+</body>
+</html>
